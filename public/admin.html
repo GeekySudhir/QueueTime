@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gym Jukebox - Admin Player</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #1e293b;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; }
+    h1 { color: #f97316; margin-bottom: 20px; }
+    .player-box { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
+    #player-wrapper { position: relative; width: 100%; height: 0; padding-bottom: 56.25%; margin-bottom: 16px; border-radius: 8px; overflow: hidden; background: #000; }
+    #player-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+    .controls { display: flex; gap: 12px; }
+    button { padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: #fff; font-size: 1rem; }
+    .btn-skip { background: var(--danger); }
+    .track-details { font-size: 1.2rem; font-weight: bold; margin-bottom: 12px; }
+    .queue-box { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #334155; }
+    ul { list-style: none; margin-top: 10px; }
+    li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; }
+    .remove-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+  <h1>🎛️ Admin Sound System Host</h1>
+
+  <div class="player-box">
+    <div id="player-wrapper">
+      <div id="yt-player"></div>
+    </div>
+    <div class="track-details" id="current-title">Status: Idle</div>
+    <div class="controls">
+      <button class="btn-skip" id="skip-btn">⚡ Skip Song</button>
+    </div>
+  </div>
+
+  <div class="queue-box">
+    <h3>Active Queue</h3>
+    <ul id="admin-queue"></ul>
+  </div>
+
+  <!-- YouTube iFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const socket = io();
+    let player = null;
+    let isPlayerReady = false;
+
+    // Load YouTube iFrame API player
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('yt-player', {
+        height: '100%',
+        width: '100%',
+        playerVars: {
+          'autoplay': 1,
+          'controls': 1
+        },
+        events: {
+          'onReady': onPlayerReady,
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      isPlayerReady = true;
+    }
+
+    function onPlayerStateChange(event) {
+      // Auto advance to next song when video ends
+      if (event.data === YT.PlayerState.ENDED) {
+        socket.emit('admin-next-song');
+      }
+    }
+
+    // Socket listeners
+    socket.on('play-video', (song) => {
+      if (isPlayerReady && song) {
+        player.loadVideoById(song.videoId);
+      }
+    });
+
+    socket.on('state-update', (state) => {
+      const titleElem = document.getElementById('current-title');
+      if (state.currentSong) {
+        titleElem.innerText = `Now Playing: ${state.currentSong.title} (Added by ${state.currentSong.addedBy})`;
+      } else {
+        titleElem.innerText = "Status: Waiting for songs in queue...";
+        if (isPlayerReady && player.stopVideo) {
+          player.stopVideo();
+        }
+      }
+
+      // Render queue
+      const queueList = document.getElementById('admin-queue');
+      queueList.innerHTML = state.queue.map((song) => `
+        <li>
+          <span>${song.title} (${song.addedBy})</span>
+          <button class="remove-btn" onclick="removeSong('${song.id}')">Remove</button>
+        </li>
+      `).join('');
+    });
+    document.getElementById('skip-btn').addEventListener('click', () => {
+      socket.emit('admin-next-song');
+    });
+
+    function removeSong(id) {
+      socket.emit('remove-song', id);
+    }
+  </script>
+</body>
+</html>

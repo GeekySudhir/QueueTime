@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gym Jukebox - Queue A Song</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #f97316;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 500px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; text-align: center; margin-bottom: 20px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+    .card { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 16px; border: 1px solid #334155; }
+    .card h2 { font-size: 1rem; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; font-weight: 600; }
+    input { width: 100%; padding: 12px; margin-bottom: 10px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 8px; font-size: 1rem; }
+    button { width: 100%; padding: 12px; background: var(--accent); border: none; color: #fff; font-weight: bold; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
+    button:active { opacity: 0.8; }
+    .now-playing { border-left: 4px solid var(--accent); }
+    .now-playing-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 4px; }
+    .now-playing-sub { font-size: 0.85rem; color: var(--muted); }
+    .queue-list { list-style: none; }
+    .queue-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #334155; }
+    .queue-item:last-child { border-bottom: none; }
+    .song-info { display: flex; flex-direction: column; gap: 2px; }
+    .song-title { font-weight: 600; font-size: 0.95rem; }
+    .song-meta { font-size: 0.75rem; color: var(--muted); }
+    .error { color: #ef4444; font-size: 0.85rem; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+
+  <h1>💪 Gym Jukebox</h1>
+
+  <!-- Now Playing Section -->
+  <div class="card now-playing">
+    <h2>Now Playing</h2>
+    <div id="now-playing-content">
+      <div class="now-playing-title">No track playing</div>
+      <div class="now-playing-sub">Add a song below to start the music</div>
+    </div>
+  </div>
+
+  <!-- Add Song Form -->
+  <div class="card">
+    <h2>Add to Queue</h2>
+    <form id="add-form">
+      <input type="text" id="song-url" placeholder="Paste YouTube Link or Video ID" required>
+      <input type="text" id="song-title" placeholder="Song Name / Artist (Optional)">
+      <input type="text" id="added-by" placeholder="Your Name (Optional)">
+      <button type="submit">Queue Song</button>
+      <div id="error-msg" class="error"></div>
+    </form>
+  </div>
+
+  <!-- Upcoming Queue -->
+  <div class="card">
+    <h2>Up Next</h2>
+    <ul id="queue-container" class="queue-list">
+      <li style="color: var(--muted); font-size: 0.9rem;">The queue is currently empty.</li>
+    </ul>
+  </div>
+
+  <script>
+    const socket = io();
+
+    const addForm = document.getElementById('add-form');
+    const songUrlInput = document.getElementById('song-url');
+    const songTitleInput = document.getElementById('song-title');
+    const addedByInput = document.getElementById('added-by');
+    const errorDiv = document.getElementById('error-msg');
+    const nowPlayingDiv = document.getElementById('now-playing-content');
+    const queueContainer = document.getElementById('queue-container');
+
+    addForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      errorDiv.style.display = 'none';
+
+      socket.emit('add-song', {
+        url: songUrlInput.value,
+        title: songTitleInput.value,
+        addedBy: addedByInput.value
+      });
+
+      songUrlInput.value = '';
+      songTitleInput.value = '';
+    });
+
+    socket.on('error-msg', (msg) => {
+      errorDiv.innerText = msg;
+      errorDiv.style.display = 'block';
+    });
+
+    socket.on('state-update', (state) => {
+      // Update Now Playing
+      if (state.currentSong) {
+        nowPlayingDiv.innerHTML = `
+          <div class="now-playing-title">${escapeHtml(state.currentSong.title)}</div>
+          <div class="now-playing-sub">Queued by ${escapeHtml(state.currentSong.addedBy)}</div>
+        `;
+      } else {
+        nowPlayingDiv.innerHTML = `
+          <div class="now-playing-title">No track playing</div>
+          <div class="now-playing-sub">Add a song below to start the music</div>
+        `;
+      }
+
+      // Update Queue List
+      if (state.queue.length === 0) {
+        queueContainer.innerHTML = `<li style="color: var(--muted); font-size: 0.9rem;">The queue is currently empty.</li>`;
+      } else {
+        queueContainer.innerHTML = state.queue.map((song, index) => `
+          <li class="queue-item">
+            <div class="song-info">
+              <span class="song-title">#${index + 1} ${escapeHtml(song.title)}</span>
+              <span class="song-meta">Added by ${escapeHtml(song.addedBy)} at ${song.addedAt}</span>
+            </div>
+          </li>
+        `).join('');
+      }
+    });
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>
