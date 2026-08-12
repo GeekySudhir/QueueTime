@@ -1,4 +1,4 @@
-#This workflow will build a docker container, publish it to Google Containerr test
+#This workflow will build a docker container, publish it to Google Containers
 # Registry, and deploy it to GKE when there is a push to the "main"
 # branch.
 #this will be a test commit to see if the workflow is triggered
