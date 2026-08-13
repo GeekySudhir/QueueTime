@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-#This workflow will build a docker container, publish it to Google Containers
-=======
+
 #This workflow will build a docker container, publish it to Google Container
->>>>>>> feature-branch
 # Registry, and deploy it to GKE when there is a push to the "main"
 # branch.
 #this will be a test commit to see if the workflow is triggered
